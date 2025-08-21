@@ -1,0 +1,30 @@
+name: CI_CD_Terraform (caller)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        description: "Environment name label (informational)"
+        required: true
+        default: "Production"
+        type: choice
+        options:
+          - Production
+      WORKING_FOLDER:
+        description: "Path to Terraform code"
+        required: true
+        default: "infra"
+        type: string
+  pull_request:
+    paths:
+      - 'infra/**.tf'
+      - '.github/workflows/**.yml'
+
+run-name: ${{ inputs.ENVIRONMENT || 'PR' }} - ${{ github.ref_name }}
+
+jobs:
+  terraform:
+    uses: ./.github/workflows/reusable-terraform.yml
+    with:
+      working_directory: ${{ github.event.inputs.WORKING_FOLDER || 'infra' }}
+      terraform_version: "1.6.6"
