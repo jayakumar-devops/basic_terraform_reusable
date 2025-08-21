@@ -1,0 +1,19 @@
+name: CI_CD_Terraform_Apply (caller)
+
+on:
+  workflow_dispatch:
+    inputs:
+      WORKING_FOLDER:
+        description: "Path to Terraform code"
+        required: true
+        default: "infra"
+        type: string
+
+jobs:
+  terraform-apply:
+    environment: Production   # 🔹 links to the environment you created
+    uses: ./.github/workflows/reusable-terraform.yml
+    with:
+      working_directory: ${{ github.event.inputs.WORKING_FOLDER || 'infra' }}
+      terraform_version: "1.6.6"
+      apply: true   # 🔹 tells reusable workflow to run `terraform apply`
