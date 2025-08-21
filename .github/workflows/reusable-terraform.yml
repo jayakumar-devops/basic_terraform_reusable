@@ -1,5 +1,3 @@
-name: reusable-terraform
-
 on:
   workflow_call:
     inputs:
@@ -7,47 +5,45 @@ on:
         required: true
         type: string
       terraform_version:
-        required: false
+        required: true
         type: string
-        default: "1.6.6"
+      apply:
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  fmt-validate-plan:
+  terraform:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ inputs.terraform_version }}
 
-      - name: Terraform FMT (check only)
-        working-directory: ${{ inputs.working_directory }}
-        run: terraform fmt -check -recursive
-
       - name: Terraform Init
         working-directory: ${{ inputs.working_directory }}
-        run: terraform init -input=false
+        run: terraform init
 
       - name: Terraform Validate
         working-directory: ${{ inputs.working_directory }}
         run: terraform validate
 
       - name: Terraform Plan
-        id: plan
+        if: ${{ inputs.apply == 'false' }}
         working-directory: ${{ inputs.working_directory }}
-        run: |
-          set -e
-          terraform plan -input=false -out=tfplan.out
-          terraform show -no-color tfplan.out > tfplan.txt
+        run: terraform plan -out=tfplan
 
-      - name: Upload plan artifacts
+      - name: Upload Plan
+        if: ${{ inputs.apply == 'false' }}
         uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
-          path: |
-            ${{ inputs.working_directory }}/tfplan.out
-            ${{ inputs.working_directory }}/tfplan.txt
+          path: ${{ inputs.working_directory }}/tfplan
+
+      - name: Terraform Apply
+        if: ${{ inputs.apply == 'true' }}
+        working-directory: ${{ inputs.working_directory }}
+        run: terraform apply -auto-approve
