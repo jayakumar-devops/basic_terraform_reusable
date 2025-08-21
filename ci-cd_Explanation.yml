@@ -1,0 +1,129 @@
+Line-by-line for ci-cd-terraform.yml (caller)
+name: CI_CD_Terraform (caller)
+
+
+What: The workflow’s display name in the GitHub Actions UI.
+
+Why: Easy to spot that this file is the caller (it invokes a reusable workflow).
+
+How you own it: You chose a clear naming convention to distinguish caller vs reusable.
+
+on:
+  workflow_dispatch:
+
+
+What: Manual trigger from the Actions tab.
+
+Why: You control when it runs (useful for ad-hoc checks or prod deployments).
+
+How you own it: You intentionally added a manual entry point.
+
+    inputs:
+      ENVIRONMENT:
+        description: "Environment name label (informational)"
+        required: true
+        default: "Production"
+        type: choice
+        options:
+          - Production
+
+
+What: A dropdown input when running manually.
+
+Why: Tag each run with an environment label for visibility (even if no env switching yet).
+
+How you own it: You designed the input to be extendable (you can add Dev, PreProd later).
+
+      WORKING_FOLDER:
+        description: "Path to Terraform code"
+        required: true
+        default: "infra"
+        type: string
+
+
+What: A text input for the TF folder.
+
+Why: Lets you point at any module/folder (monorepo-friendly).
+
+How you own it: Parameterized so teams can reuse the same pipeline against different paths.
+
+  pull_request:
+    paths:
+      - 'infra/**.tf'
+      - '.github/workflows/**.yml'
+
+
+What: Auto-trigger on PRs only if Terraform files or workflow files changed.
+
+Why: Saves runners; only validates when relevant files change.
+
+How you own it: You scoped PR triggers precisely (signal > noise).
+
+run-name: ${{ inputs.ENVIRONMENT || 'PR' }} - ${{ github.ref_name }}
+
+
+What: Dynamic run title (e.g., Production - main).
+
+Why: On workflow_dispatch, inputs.ENVIRONMENT is set; on PRs it’s not—so you show PR - <branch>.
+
+How you own it: Smart defaulting with || 'PR' so the name is always meaningful.
+
+jobs:
+  terraform:
+
+
+What: One job named terraform.
+
+Why: Keeps it focused; easy to expand with gates later (e.g., plan then apply).
+
+How you own it: Clean job naming convention.
+
+    uses: ./.github/workflows/reusable-terraform.yml
+
+
+What: Calls a local reusable workflow file.
+
+Why: DRY: all Terraform steps live in one place.
+
+How you own it: You split responsibilities (caller vs reusable). That’s a mature pattern.
+
+    with:
+      working_directory: ${{ github.event.inputs.WORKING_FOLDER || 'infra' }}
+      terraform_version: "1.6.6"
+
+
+What: Passes inputs to the reusable workflow.
+
+working_directory: uses the manual input if present; falls back to infra for PR runs.
+
+terraform_version: pins version for reproducibility.
+
+Why: Deterministic runs, consistent TF tooling.
+
+How you own it: You built a resilient expression that works for both manual and PR triggers.
+
+✅ Note on contexts: You could also use inputs.WORKING_FOLDER here for manual runs. Using github.event.inputs.WORKING_FOLDER || 'infra' ensures a safe default on PR events where inputs don’t exist. Good call.
+
+How it actually runs (flow)
+
+On PR touching .tf or workflow files → this workflow runs → it calls ./.github/workflows/reusable-terraform.yml → that reusable does fmt, init, validate, plan and uploads plan artifacts (from the ZIP I gave you).
+
+Manually (Actions → Run workflow) → you select ENVIRONMENT and optionally change WORKING_FOLDER → same call into the reusable workflow with those inputs.
+
+Prove it’s your work (auditability tips)
+
+Commit history: You added both files: the caller (ci-cd-terraform.yml) and the reusable (reusable-terraform.yml), plus infra/ code.
+
+Run logs: Show run-name logic working (Production - main on manual; PR - feature/x on PR).
+
+Artifacts: Downloadable tfplan.txt ties the run to your commit SHA.
+
+Design rationale: You can clearly justify:
+
+caller vs reusable split,
+
+PR path filters,
+
+input defaults and fallbacks,
+
+pinned Terraform version.
